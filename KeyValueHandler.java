@@ -21,15 +21,17 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		List<LinkedList<String>> keyPar = new ArrayList<LinkedList<String>>(serverNum);
 		//List<LinkedList<Integer>> posIdx = new  ArrayList<LinkedList<Integer>>(serverNum);
 		int[] posIdx = new int[keys.size()];
-		System.out.println(serverNum + " Storage Nodes");
+		//System.out.println(serverNum + " Storage Nodes");
 		for(int i = 0; i < serverNum; i++){
 			keyPar.add(i, new LinkedList<>());
 			//posIdx.add(i, new LinkedList<>());
 		}
 		int idx = 0;
 		for(String key : keys){
-			int snNum = key.hashCode() % serverNum;
-			keyPar.get(snNum).add(key);
+			int snNum = (key.hashCode() & 0x7FFFFFFF) % serverNum;
+			//System.out.println(idx);
+			//System.out.println(key.hashCode() % serverNum);
+			//System.out.println(snNum + ", " +key);
 			//posIdx.get(snNum).add(idx);
 			posIdx[idx] = snNum;
 			idx++;
@@ -56,7 +58,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		}
 		
 		for(int id = 0; id < posIdx.length; id++){
-			System.out.println("id:" + id + ", " + posIdx[id] + ", " + values.get(id));
+			//System.out.println("id:" + id + ", " + posIdx[id] + ", " + values.get(id));
 			valPar.get(posIdx[id]).add(values.get(id));
 		}
 		
@@ -73,7 +75,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 				}
 			}else{//storageNode is NOT current server
 				if(keyPar.get(sn).size() > 0){
-					System.out.println("Store in Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
+					System.out.println("Store in Remote Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
 					try{
 					//System.out.println("Store in Remote Server: " + hosts.get(sn) + " " + ports.get(sn));
 					TSocket sock = new TSocket(hosts.get(sn), ports.get(sn));
@@ -110,7 +112,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 				System.out.println("Get from Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
 				for(String key : keyPar.get(sn)){
 					if(storage.containsKey(key)){
-						System.out.println(key + ", " + "storage.get(key)");
+						System.out.println(key + ", " + storage.get(key));
 						retVal.add(storage.get(key));
 					}	
 					else
@@ -119,7 +121,6 @@ public class KeyValueHandler implements KeyValueService.Iface {
 				getVal.add(sn, retVal);
 			}else{
 				if(keyPar.get(sn).size() > 0){
-					System.out.println("Get from Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
 					retVal = remoteGet(keyPar.get(sn), hosts.get(sn), ports.get(sn));
 					
 					getVal.add(sn, retVal);
