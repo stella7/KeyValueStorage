@@ -1,0 +1,4 @@
+1) run ./build.sh to build the code
+2) populate a1.config with a list of hosts and ports
+3) use run_storage_node.sh to launch storage nodes remotely
+4) use kill_storage_nodes.sh to terminate the storage nodes
