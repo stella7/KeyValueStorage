@@ -1,4 +1,6 @@
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
 import org.apache.thrift.*;
 import org.apache.thrift.transport.*;
 import org.apache.thrift.protocol.*;
@@ -32,6 +34,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 			//System.out.println(idx);
 			//System.out.println(key.hashCode() % serverNum);
 			//System.out.println(snNum + ", " +key);
+			keyPar.get(snNum).add(key);
 			//posIdx.get(snNum).add(idx);
 			posIdx[idx] = snNum;
 			idx++;
@@ -39,6 +42,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		Object[] ret = new Object[2];
 		ret[0] = keyPar;
 		ret[1] = posIdx;
+		System.out.println("Finish Partitioning");
 		return ret;
 	}
 	
@@ -100,17 +104,19 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		ArrayList<LinkedList<String>> keyPar = (ArrayList<LinkedList<String>>) pat[0];
 		//ArrayList<LinkedList<Integer>> posIdx = (ArrayList<LinkedList<Integer>>) pat[1];
 		int[] posIdx = (int[]) pat[1];
-		List<LinkedList<String>> getVal = new ArrayList<LinkedList<String>>(serverNum);
+		List<ConcurrentLinkedQueue<String>> getVal = new ArrayList<ConcurrentLinkedQueue<String>>(serverNum);
 		
 		for(int i = 0; i < serverNum; i++){
-			getVal.add(i, new LinkedList<>());
+			getVal.add(i, new ConcurrentLinkedQueue<>());;
 		}
 		
 		for(int sn = 0; sn < serverNum; sn++){
-			LinkedList<String> retVal = new LinkedList<>();
+			ConcurrentLinkedQueue<String> retVal = new ConcurrentLinkedQueue<>();
 			if(sn == myNum){
 				System.out.println("Get from Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
+				//System.out.println(keyPar.get(sn).size());
 				for(String key : keyPar.get(sn)){
+					//System.out.println("Get key: " + key);
 					if(storage.containsKey(key)){
 						System.out.println(key + ", " + storage.get(key));
 						retVal.add(storage.get(key));
@@ -130,13 +136,14 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		List<String> ret = new ArrayList<String>();
 		for(int id = 0; id < posIdx.length; id++){
 			int snNum = posIdx[id];
-			ret.add(getVal.get(snNum).removeFirst());
+			ret.add(getVal.get(snNum).poll());
 		}
 		return ret;
 	}
-	private LinkedList<String> remoteGet(List<String> keys, String remoteHost, int remotePort){
+	
+	private ConcurrentLinkedQueue<String> remoteGet(List<String> keys, String remoteHost, int remotePort){
 		
-		LinkedList<String> ret = new LinkedList<String>();
+		ConcurrentLinkedQueue<String> ret = new ConcurrentLinkedQueue<String>();
 		try{
 			System.out.println("Get Value from Remote Server: " + remoteHost + " " + remotePort);
 			TSocket sock = new TSocket(remoteHost, remotePort);

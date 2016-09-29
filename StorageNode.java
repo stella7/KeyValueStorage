@@ -37,13 +37,13 @@ public class StorageNode {
       log.info("Launching storage node " + myNum + ", " + hosts.get(myNum) + ":" + ports.get(myNum));
 
       // Launch a Thrift server here
-      KeyValueService.Processor<KeyValueService.Iface> processor = new KeyValueService.Processor<>(new KeyValueHandler(hosts,ports));
+      KeyValueService.Processor<KeyValueService.Iface> processor = new KeyValueService.Processor<>(new KeyValueHandler(myNum, hosts,ports));
       TNonblockingServerSocket socket = new TNonblockingServerSocket(ports.get(myNum));
       THsHaServer.Args sargs = new THsHaServer.Args(socket);
       sargs.protocolFactory(new TBinaryProtocol.Factory());
       sargs.transportFactory(new TFramedTransport.Factory());
       sargs.processorFactory(new TProcessorFactory(processor));
-      sargs.maxWorkerThreads(5);
+      sargs.maxWorkerThreads(hosts.size() * 16);
 
       TServer server = new THsHaServer(sargs);
       server.serve();
