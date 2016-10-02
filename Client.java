@@ -14,9 +14,10 @@ public class Client {
 	static final String AB = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 	static SecureRandom rnd = new SecureRandom();
 	static HashMap<String, String> keyVal = new HashMap<String, String>();
-	static int listLen = 5, keyLen = 15, valLen = 20;
+	static int listLen = 10, keyLen = 10, valLen = 10;
 	static Logger log;
 	public static void main(String [] args) {
+		
 		  	try {
 		  		BasicConfigurator.configure();
 		        log = Logger.getLogger(Client.class.getName());
@@ -66,13 +67,19 @@ public class Client {
       	  threads[j].start();
         }
         
+		for (int t = 0; t < threadNum; t++) {
+		    threads[t].join();
+		}
+        
      }catch (Exception x){
     	 x.printStackTrace();
      }
+    
   }
   
   static KeyValueService.Client startClient(String host, Integer port){
 	  while(true){
+
 	  	  try{
 			  TSocket sock = new TSocket(host, port);
 			  TTransport transport = new TFramedTransport(sock);
@@ -83,6 +90,7 @@ public class Client {
 		  }catch(Exception e){
 			  log.error("Unable to connect to server");
 		  }
+	  	
 	  }
 
 	  
@@ -98,7 +106,7 @@ public class Client {
 		  if(keyVal.containsKey(key))
 			  val = keyVal.get(key);
 		  else val = "";
-		  System.out.println("search: " + key + ", " + val);
+		  //System.out.println("search: " + key + ", " + val);
 		  if(!val.equals(retVal)){
 			  ret = false;
 			  System.out.println("multiGet for key: " + key + " received " + retVal + ", expected " + keyVal.get(key));
@@ -119,16 +127,21 @@ public class Client {
   
   static class clientThread implements Runnable{
 	KeyValueService.Client client;
-	int threadId;
+	int clientNum;
 	String host;
 	Integer port;
-	public clientThread(int threadId, String host, Integer port){
+	long putTime, getTime;
+	public clientThread(int clientNum, String host, Integer port){
 		//this.client = client;
 		this.host = host;
 		this.port = port;
 		client = startClient(host, port);
-		this.threadId = threadId;
+		this.clientNum = clientNum;
 	}
+	
+	long getPutTime(){return putTime;}
+	long getGetTime(){return getTime;}
+	
 	@Override
 	public void run() {
 		// TODO Auto-generated method stub
@@ -142,44 +155,64 @@ public class Client {
     		putVal.add(val1);
     		keyVal.put(key1, val1);
     		
-    		System.out.println("Thread " + threadId + " Put: " + key1 + ", " + val1);
+    		//System.out.println("Thread " + clientNum + " Put: " + key1 + ", " + val1);
+    	}
+    	int numOps = 1000;
+    	for(int k = 0; k < numOps; k++){
+    		List<String> getKey = new ArrayList<String>();
+        	for(int i = 0; i < listLen / 2; i++){
+        		String key2 = randomString(keyLen, 0);
+        		//String val = randomString(valLen, 1);
+        		getKey.add(key2);
+        		getKey.add(putKey.get(i));
+        		
+        		//listVal.add(val);
+        		//keyVal.put(key, val);
+        	}
+        	for(String s : getKey){
+        		//System.out.println("Thread " + clientNum + " Get: " + s);
+        	}
+        	
+        	List<String> listRet = new ArrayList<String>();
+        	
+        	try{
+        		long startTime = System.nanoTime();
+        		client.multiPut(putKey, putVal);
+        		long singlePut = System.nanoTime() - startTime;
+        		putTime += singlePut;
+        		//System.out.println(clientNum + "Put: " + latencyPut + "ms");
+        	}catch (Exception e){
+        		log.error("Exception in thread " + clientNum + " multiPut");
+        	}
+        	
+        	try{
+        		long startTime = System.nanoTime();
+        		listRet = client.multiGet(getKey);
+        		long singleGet = System.nanoTime() - startTime;
+        		getTime += singleGet;
+        		//System.out.println(clientNum + "Get: " + latencyGet + "ms");
+        	}catch(Exception e){
+        		log.error("Exception in thread " + clientNum + " multiGet");
+        	}
+        	
+        	try{
+        		Thread.sleep(10);
+        	}catch(InterruptedException ex) {
+        	    Thread.currentThread().interrupt();
+        	}
+        	
     	}
     	
-    	List<String> getKey = new ArrayList<String>();
-    	for(int i = 0; i < listLen / 2; i++){
-    		String key2 = randomString(keyLen, 0);
-    		//String val = randomString(valLen, 1);
-    		getKey.add(key2);
-    		getKey.add(putKey.get(i));
-    		
-    		//listVal.add(val);
-    		//keyVal.put(key, val);
-    	}
-    	for(String s : getKey){
-    		System.out.println("Thread " + threadId + " Get: " + s);
-    	}
-    	
-    	List<String> listRet = new ArrayList<String>();
-    	
-    	try{
-    		client.multiPut(putKey, putVal);
-    	}catch (Exception e){
-    		log.error("Exception in thread " + threadId + " multiPut");
-    	}
-    	
-    	try{
-    		listRet = client.multiGet(getKey);
-    	}catch(Exception e){
-    		log.error("Exception in thread " + threadId + " multiGet");
-    	}
-  		  		  
+  		float putLatency = (float) putTime / numOps;
+  		float getLatency = (float) getTime / numOps;
+  		System.out.println(putLatency + ", " + getLatency);
   		/*
         for(String s : listRet){
         	  System.out.println(s + " ");
         }
         */
-        boolean flag = compare(keyVal, getKey, listRet);
-        System.out.println(flag);
+        //boolean flag = compare(keyVal, getKey, listRet);
+        //System.out.println(flag);
 	}
 	  
   }
