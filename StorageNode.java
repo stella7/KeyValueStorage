@@ -43,14 +43,25 @@ public class StorageNode {
       
       KeyValueService.Processor<KeyValueService.Iface> processor =new KeyValueService.Processor<>(kvh);
       // Launch a Thrift server here
+      /*
       TNonblockingServerSocket socket = new TNonblockingServerSocket(ports.get(myNum));
       THsHaServer.Args sargs = new THsHaServer.Args(socket);
       sargs.protocolFactory(new TBinaryProtocol.Factory());
       sargs.transportFactory(new TFramedTransport.Factory());
       sargs.processorFactory(new TProcessorFactory(processor));
       sargs.maxWorkerThreads(hosts.size() * 16);
-
       TServer server = new THsHaServer(sargs);
+      */
+      TNonblockingServerTransport socket = new TNonblockingServerSocket(ports.get(myNum));
+      TThreadedSelectorServer.Args sargs = new TThreadedSelectorServer.Args(socket);
+      sargs.transportFactory(new TFramedTransport.Factory());
+      sargs.protocolFactory(new TBinaryProtocol.Factory());
+      //sargs.processor(new MapKeeper.Processor(mapkeeper));
+      sargs.processorFactory(new TProcessorFactory(processor));
+      sargs.selectorThreads(4);
+      sargs.workerThreads(32);
+      TServer server = new TThreadedSelectorServer(sargs);
+      
       server.serve();
       thread.join();
       //throw new Error("This code needs more work!");

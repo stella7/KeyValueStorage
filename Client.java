@@ -15,6 +15,7 @@ public class Client {
 	static SecureRandom rnd = new SecureRandom();
 	static HashMap<String, String> keyVal = new HashMap<String, String>();
 	static int listLen = 10, keyLen = 10, valLen = 10;
+	static int numOps = 1000;
 	static Logger log;
 	public static void main(String [] args) {
 		
@@ -62,15 +63,30 @@ public class Client {
         /*------------------------*/
   		int threadNum = 32;
         Thread[] threads = new Thread[threadNum];
+        clientThread[] ct = new clientThread[threadNum];
+        long startTime = System.currentTimeMillis();
         for(int j = 0; j < threadNum; j++){
-      	  threads[j] = new Thread(new clientThread(j, hosts.get(0), ports.get(0)));
+          ct[j] = new clientThread(j, hosts.get(0), ports.get(0));
+      	  threads[j] = new Thread(ct[j]);
       	  threads[j].start();
         }
-        
+
 		for (int t = 0; t < threadNum; t++) {
 		    threads[t].join();
 		}
-        
+		
+        long diff = System.currentTimeMillis() - startTime;
+        float TPS = 1000f * numOps * 32 / diff;
+		System.out.println("Troughput: " + TPS);
+		float avgPutLatency = 0, avgGetLatency = 0;
+		for(int t = 0; t < threadNum; t++){
+			avgPutLatency += ct[t].getPutTime();
+			avgGetLatency += ct[t].getGetTime();
+		}
+		
+		avgPutLatency /= threadNum;
+		avgGetLatency /= threadNum;
+		System.out.println(avgPutLatency + ", " + avgGetLatency);
      }catch (Exception x){
     	 x.printStackTrace();
      }
@@ -131,6 +147,7 @@ public class Client {
 	String host;
 	Integer port;
 	long putTime, getTime;
+	float putLatency, getLatency;
 	public clientThread(int clientNum, String host, Integer port){
 		//this.client = client;
 		this.host = host;
@@ -139,8 +156,8 @@ public class Client {
 		this.clientNum = clientNum;
 	}
 	
-	long getPutTime(){return putTime;}
-	long getGetTime(){return getTime;}
+	float getPutTime(){return putLatency;}
+	float getGetTime(){return getLatency;}
 	
 	@Override
 	public void run() {
@@ -157,7 +174,7 @@ public class Client {
     		
     		//System.out.println("Thread " + clientNum + " Put: " + key1 + ", " + val1);
     	}
-    	int numOps = 1000;
+    	
     	for(int k = 0; k < numOps; k++){
     		List<String> getKey = new ArrayList<String>();
         	for(int i = 0; i < listLen / 2; i++){
@@ -205,9 +222,9 @@ public class Client {
             //System.out.println(flag);
     	}
     	
-  		float putLatency = (float) putTime / numOps;
-  		float getLatency = (float) getTime / numOps;
-  		System.out.println(putLatency + ", " + getLatency);
+  		putLatency = (float) putTime / numOps;
+  		getLatency = (float) getTime / numOps;
+  		//System.out.println(putLatency + ", " + getLatency);
   		/*
         for(String s : listRet){
         	  System.out.println(s + " ");
