@@ -1,3 +1,4 @@
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -10,6 +11,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 	private final HashMap<Integer, String> hosts;
 	private final HashMap<Integer, Integer> ports;
     private final int myNum, serverNum;
+    
 	//private List<LinkedList<String>> keyPar = new ArrayList<LinkedList<String>>(serverNum);
 	//private List<LinkedList<Integer>> posIdx = new  ArrayList<LinkedList<Integer>>(serverNum);
 	public KeyValueHandler(int myNum, HashMap<Integer, String> hosts,HashMap<Integer, Integer> ports){
@@ -19,9 +21,75 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		this.serverNum = hosts.size();
 	}
 	
-	public Object[] partition(List<String> keys){
+	public void multiPut(List<String> keys, List<String> values) throws IllegalArgument{
+		//long start = System.nanoTime();
+		if(keys.size() != values.size()){
+			throw new IllegalArgument("size not equal!");
+		}
+		
+		//System.out.println("MultiPut Partitioning...");
+		ArrayList<String>[] keyPar = new ArrayList[serverNum];
+		ArrayList<String>[] valPar = new ArrayList[serverNum];
+		//int[] posIdx = new int[keys.size()];
+		//System.out.println(serverNum + " Storage Nodes");
+		for(int i = 0; i < serverNum; i++){
+			keyPar[i] = new ArrayList<>();
+			valPar[i] = new ArrayList<>();
+			//posIdx.add(i, new LinkedList<>());
+		}
+		int idx = 0;
+		for(int i = 0; i < keys.size(); i++){
+			String key = keys.get(i);
+			int snNum = (key.hashCode() & 0x7FFFFFFF) % serverNum;
+			//System.out.println(snNum + ", " +key);
+			keyPar[snNum].add(key);
+			String val = values.get(i);
+			valPar[snNum].add(val);
+			//posIdx.get(snNum).add(idx);
+			//posIdx[idx] = snNum;
+			idx++;
+		}
+		//long end = System.nanoTime() - start;
+		//long end2;
+		for(int sn = 0; sn < serverNum; sn++){
+			
+			if(sn == myNum){//storageNode is current server
+				//System.out.println("Store in Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
+				for(int j = 0; j < keyPar[sn].size(); j++){
+					String key = keyPar[sn].get(j);
+					String val = valPar[sn].get(j);
+					//System.out.println(key + ", " + val);
+					storage.put(key, val);
+				}
+			}else{//storageNode is NOT current server
+				if(keyPar[sn].size() > 0){
+					//System.out.println("Store in Remote Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
+					//long openStart = System.currentTimeMillis();
+					try{
+					TSocket sock = new TSocket(hosts.get(sn), ports.get(sn));
+			  		TTransport transport = new TFramedTransport(sock);
+			  		TProtocol protocol = new TBinaryProtocol(transport);
+			  		KeyValueService.Client client = new KeyValueService.Client(protocol);
+			  		transport.open();
+			  		client.multiPut(keyPar[sn], valPar[sn]);
+			  		transport.close();
+					}catch(TException x){
+						x.printStackTrace();
+					}
+					//long openEnd = System.currentTimeMillis() - openStart;
+					//System.out.println("open " + openEnd);
+				}
+				
+			}
+		}
+		//long end3 = System.nanoTime() - start;
+		//System.out.println(end + " " + end3);
+		
+	}
+	
+	public List<String> multiGet(List<String> keys){
+		//System.out.println("multiGet Partitioning...");
 		List<LinkedList<String>> keyPar = new ArrayList<LinkedList<String>>(serverNum);
-		//List<LinkedList<Integer>> posIdx = new  ArrayList<LinkedList<Integer>>(serverNum);
 		int[] posIdx = new int[keys.size()];
 		//System.out.println(serverNum + " Storage Nodes");
 		for(int i = 0; i < serverNum; i++){
@@ -31,79 +99,13 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		int idx = 0;
 		for(String key : keys){
 			int snNum = (key.hashCode() & 0x7FFFFFFF) % serverNum;
-			//System.out.println(idx);
-			//System.out.println(key.hashCode() % serverNum);
 			//System.out.println(snNum + ", " +key);
 			keyPar.get(snNum).add(key);
 			//posIdx.get(snNum).add(idx);
 			posIdx[idx] = snNum;
 			idx++;
 		}
-		Object[] ret = new Object[2];
-		ret[0] = keyPar;
-		ret[1] = posIdx;
-		System.out.println("Finish Partitioning");
-		return ret;
-	}
-	
-	public void multiPut(List<String> keys, List<String> values) throws IllegalArgument{
-		if(keys.size() != values.size()){
-			throw new IllegalArgument("size not equal!");
-		}
 		
-		System.out.println("MultiPut Partitioning...");
-		Object[] pat = partition(keys);
-		ArrayList<LinkedList<String>> keyPar = (ArrayList<LinkedList<String>>) pat[0];
-		//ArrayList<LinkedList<Integer>> posIdx = (ArrayList<LinkedList<Integer>>) pat[1];
-		int[] posIdx = (int[]) pat[1];
-		List<LinkedList<String>> valPar = new ArrayList<LinkedList<String>>(serverNum);
-		for(int i = 0; i < serverNum; i++){
-			valPar.add(i, new LinkedList<>());
-		}
-		
-		for(int id = 0; id < posIdx.length; id++){
-			//System.out.println("id:" + id + ", " + posIdx[id] + ", " + values.get(id));
-			valPar.get(posIdx[id]).add(values.get(id));
-		}
-		
-		for(int sn = 0; sn < serverNum; sn++){
-			
-			if(sn == myNum){//storageNode is current server
-				//System.out.println("Store in Local Server...");
-				System.out.println("Store in Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
-				for(int j = 0; j < keyPar.get(sn).size(); j++){
-					String key = keyPar.get(sn).get(j);
-					String val = valPar.get(sn).get(j);
-					System.out.println(key + ", " + val);
-					storage.put(key, val);
-				}
-			}else{//storageNode is NOT current server
-				if(keyPar.get(sn).size() > 0){
-					System.out.println("Store in Remote Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
-					try{
-					//System.out.println("Store in Remote Server: " + hosts.get(sn) + " " + ports.get(sn));
-					TSocket sock = new TSocket(hosts.get(sn), ports.get(sn));
-			  		TTransport transport = new TFramedTransport(sock);
-			  		TProtocol protocol = new TBinaryProtocol(transport);
-			  		KeyValueService.Client client = new KeyValueService.Client(protocol);
-			  		transport.open();
-			  		client.multiPut(keyPar.get(sn), valPar.get(sn));
-			  		transport.close();
-					}catch(TException x){
-						x.printStackTrace();
-					}
-				}
-				
-			}
-		}
-	}
-	
-	public List<String> multiGet(List<String> keys){
-		System.out.println("multiGet Partitioning...");
-		Object[] pat = partition(keys);
-		ArrayList<LinkedList<String>> keyPar = (ArrayList<LinkedList<String>>) pat[0];
-		//ArrayList<LinkedList<Integer>> posIdx = (ArrayList<LinkedList<Integer>>) pat[1];
-		int[] posIdx = (int[]) pat[1];
 		List<ConcurrentLinkedQueue<String>> getVal = new ArrayList<ConcurrentLinkedQueue<String>>(serverNum);
 		
 		for(int i = 0; i < serverNum; i++){
@@ -113,12 +115,12 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		for(int sn = 0; sn < serverNum; sn++){
 			ConcurrentLinkedQueue<String> retVal = new ConcurrentLinkedQueue<>();
 			if(sn == myNum){
-				System.out.println("Get from Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
+				//System.out.println("Get from Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
 				//System.out.println(keyPar.get(sn).size());
 				for(String key : keyPar.get(sn)){
 					//System.out.println("Get key: " + key);
 					if(storage.containsKey(key)){
-						System.out.println(key + ", " + storage.get(key));
+						//System.out.println(key + ", " + storage.get(key));
 						retVal.add(storage.get(key));
 					}	
 					else
@@ -128,7 +130,6 @@ public class KeyValueHandler implements KeyValueService.Iface {
 			}else{
 				if(keyPar.get(sn).size() > 0){
 					retVal = remoteGet(keyPar.get(sn), hosts.get(sn), ports.get(sn));
-					
 					getVal.add(sn, retVal);
 				}
 			}
@@ -145,7 +146,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		
 		ConcurrentLinkedQueue<String> ret = new ConcurrentLinkedQueue<String>();
 		try{
-			System.out.println("Get Value from Remote Server: " + remoteHost + " " + remotePort);
+			//System.out.println("Get Value from Remote Server: " + remoteHost + " " + remotePort);
 			TSocket sock = new TSocket(remoteHost, remotePort);
 	  		TTransport transport = new TFramedTransport(sock);
 	  		TProtocol protocol = new TBinaryProtocol(transport);
