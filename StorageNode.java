@@ -36,12 +36,11 @@ public class StorageNode {
       int myNum = Integer.parseInt(args[1]);
       log.info("Launching storage node " + myNum + ", " + hosts.get(myNum) + ":" + ports.get(myNum));
       
-      KeyValueHandler kvh = new KeyValueHandler(myNum, hosts, ports);
-      createConnection connection = new createConnection(myNum, kvh, hosts, ports);
-      Thread thread = new Thread(connection);
+      KeyValueHandler kvHandler = new KeyValueHandler(myNum, hosts, ports);
+      Thread thread = new Thread(new createConnection(myNum, kvHandler, hosts, ports));
       thread.start();
       
-      KeyValueService.Processor<KeyValueService.Iface> processor =new KeyValueService.Processor<>(kvh);
+      KeyValueService.Processor<KeyValueService.Iface> processor =new KeyValueService.Processor<>(kvHandler);
       // Launch a Thrift server here
       /*
       TNonblockingServerSocket socket = new TNonblockingServerSocket(ports.get(myNum));
@@ -56,7 +55,6 @@ public class StorageNode {
       TThreadedSelectorServer.Args sargs = new TThreadedSelectorServer.Args(socket);
       sargs.transportFactory(new TFramedTransport.Factory());
       sargs.protocolFactory(new TBinaryProtocol.Factory());
-      //sargs.processor(new MapKeeper.Processor(mapkeeper));
       sargs.processorFactory(new TProcessorFactory(processor));
       sargs.selectorThreads(4);
       sargs.workerThreads(32);
@@ -68,13 +66,13 @@ public class StorageNode {
   }
   
   private static class createConnection implements Runnable {
-      private KeyValueHandler kvh;
+      private KeyValueHandler kvHandler;
       private HashMap<Integer, String> hosts;
       private HashMap<Integer, Integer> ports;
       private int myNum;
 
-      createConnection(int myNum, KeyValueHandler kvh, HashMap<Integer, String> hosts, HashMap<Integer, Integer> ports) {
-            this.kvh = kvh;
+      createConnection(int myNum, KeyValueHandler kvHandler, HashMap<Integer, String> hosts, HashMap<Integer, Integer> ports) {
+            this.kvHandler = kvHandler;
             this.hosts = hosts;
             this.ports = ports;
             this.myNum = myNum;
@@ -103,7 +101,7 @@ public class StorageNode {
                                     }
                               }
                         }     
-                        kvh.addConnection(sn, clients);                        
+                        kvHandler.addConnection(sn, clients);                        
                   }
             }
       }

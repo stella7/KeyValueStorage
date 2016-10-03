@@ -12,8 +12,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 	private final HashMap<Integer, Integer> ports;
     private final int myNum, serverNum;
     private HashMap<Integer,LinkedList<KeyValueService.Client>> clientMap;
-	//private List<LinkedList<String>> keyPar = new ArrayList<LinkedList<String>>(serverNum);
-	//private List<LinkedList<Integer>> posIdx = new  ArrayList<LinkedList<Integer>>(serverNum);
+
 	public KeyValueHandler(int myNum, HashMap<Integer, String> hosts,HashMap<Integer, Integer> ports){
 		this.myNum = myNum;
 		this.hosts = hosts;
@@ -35,7 +34,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		//System.out.println("MultiPut Partitioning...");
 		ArrayList<String>[] keyPar = new ArrayList[serverNum];
 		ArrayList<String>[] valPar = new ArrayList[serverNum];
-		//int[] posIdx = new int[keys.size()];
+
 		//System.out.println(serverNum + " Storage Nodes");
 		for(int i = 0; i < serverNum; i++){
 			keyPar[i] = new ArrayList<>();
@@ -55,7 +54,6 @@ public class KeyValueHandler implements KeyValueService.Iface {
 			idx++;
 		}
 		//long end = System.nanoTime() - start;
-		//long end2;
 		for(Integer sn = 0; sn < serverNum; sn++){
 			
 			if(sn == myNum){//storageNode is current server
@@ -70,10 +68,10 @@ public class KeyValueHandler implements KeyValueService.Iface {
 				//long openStart = System.nanoTime();
 				if(keyPar[sn].size() > 0){
 					try{
-					KeyValueService.Client client = FetchClient(sn);
-			  		client.multiPut(keyPar[sn], valPar[sn]);
-			  		establishClient(sn,client);
-			  		//transport.close();
+						KeyValueService.Client client = FetchClient(sn);
+				  		client.multiPut(keyPar[sn], valPar[sn]);
+				  		establishClient(sn,client);
+				  		//transport.close();
 					}catch(Exception x){
 						x.printStackTrace();
 					}
@@ -156,7 +154,6 @@ public class KeyValueHandler implements KeyValueService.Iface {
 	  		for(String s : getRemote){
 	  			ret.add(s);
 	  		}
-	  		//getVal.add(sn, getRemote);
 		}catch (TException x) {
 	    	x.printStackTrace();
 	    }
@@ -166,9 +163,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 	private void establishClient(Integer nodeKey, KeyValueService.Client client){
 		LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
    		synchronized(clients) {
-	    	//LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
 	    	clients.add(client);
-	    	//clientMap.put(nodeKey, clients);
     	}
     }
 
@@ -178,9 +173,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
     	}
     	LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
     	synchronized(clients) {
-			//LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
 			KeyValueService.Client client = clients.removeFirst();
-			//clientMap.put(nodeKey, clients);
 			return client;
 		}
     		
