@@ -194,13 +194,15 @@ public class Client {
         	}catch(Exception e){
         		log.error("Exception in thread " + clientNum + " multiGet");
         	}
-        	
+        	/*
         	try{
-        		Thread.sleep(10);
+        		Thread.sleep(1000);
         	}catch(InterruptedException ex) {
         	    Thread.currentThread().interrupt();
         	}
-        	
+        	*/
+        	//boolean flag = compare(keyVal, getKey, listRet);
+            //System.out.println(flag);
     	}
     	
   		float putLatency = (float) putTime / numOps;

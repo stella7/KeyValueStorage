@@ -1,6 +1,6 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.util.HashMap;
+import java.util.*;
 
 import org.apache.thrift.server.*;
 import org.apache.thrift.server.TServer.*;
@@ -35,9 +35,14 @@ public class StorageNode {
       }
       int myNum = Integer.parseInt(args[1]);
       log.info("Launching storage node " + myNum + ", " + hosts.get(myNum) + ":" + ports.get(myNum));
-
+      
+      KeyValueHandler kvh = new KeyValueHandler(myNum, hosts, ports);
+      createConnection connection = new createConnection(myNum, kvh, hosts, ports);
+      Thread t = new Thread(connection);
+      t.start();
+      
+      KeyValueService.Processor<KeyValueService.Iface> processor =new KeyValueService.Processor<>(kvh);
       // Launch a Thrift server here
-      KeyValueService.Processor<KeyValueService.Iface> processor = new KeyValueService.Processor<>(new KeyValueHandler(myNum, hosts,ports));
       TNonblockingServerSocket socket = new TNonblockingServerSocket(ports.get(myNum));
       THsHaServer.Args sargs = new THsHaServer.Args(socket);
       sargs.protocolFactory(new TBinaryProtocol.Factory());
@@ -48,5 +53,47 @@ public class StorageNode {
       TServer server = new THsHaServer(sargs);
       server.serve();
       //throw new Error("This code needs more work!");
+  }
+  
+  private static class createConnection implements Runnable {
+      private KeyValueHandler kvh;
+      private HashMap<Integer, String> hosts;
+      private HashMap<Integer, Integer> ports;
+      private int myNum;
+
+      createConnection(int myNum, KeyValueHandler kvh, HashMap<Integer, String> hosts, HashMap<Integer, Integer> ports) {
+            this.kvh = kvh;
+            this.hosts = hosts;
+            this.ports = ports;
+            this.myNum = myNum;
+      }
+
+      public void run() {
+            for (Integer sn=0; sn < hosts.size(); sn++){
+                  if (sn != myNum){
+                        LinkedList<KeyValueService.Client> clients = new LinkedList<KeyValueService.Client>();
+                        for(int i =0; i < 64; i++){
+                              TSocket sock = new TSocket(hosts.get(sn), ports.get(sn));
+                              TTransport transport = new TFramedTransport(sock);
+                              TProtocol protocol = new TBinaryProtocol(transport);
+                        
+                              KeyValueService.Client client = new KeyValueService.Client(protocol);
+                              clients.add(client);
+                              boolean flag = false;
+                              while(flag == false){
+                                    try{
+                                          flag = true;
+                                          transport.open();
+                                    }
+                                    catch(Exception x){
+                                          flag = false;
+                                          continue;
+                                    }
+                              }
+                        }     
+                        kvh.addConnection(sn, clients);                        
+                  }
+            }
+      }
   }
 }

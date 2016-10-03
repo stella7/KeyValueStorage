@@ -11,7 +11,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 	private final HashMap<Integer, String> hosts;
 	private final HashMap<Integer, Integer> ports;
     private final int myNum, serverNum;
-    
+    private HashMap<Integer,LinkedList<KeyValueService.Client>> clientMap;
 	//private List<LinkedList<String>> keyPar = new ArrayList<LinkedList<String>>(serverNum);
 	//private List<LinkedList<Integer>> posIdx = new  ArrayList<LinkedList<Integer>>(serverNum);
 	public KeyValueHandler(int myNum, HashMap<Integer, String> hosts,HashMap<Integer, Integer> ports){
@@ -19,10 +19,15 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		this.hosts = hosts;
 		this.ports = ports;
 		this.serverNum = hosts.size();
+		this.clientMap = new HashMap<Integer, LinkedList<KeyValueService.Client>>();
+	}
+	
+	public void addConnection(Integer nodeKey, LinkedList<KeyValueService.Client> clients){
+		clientMap.put(nodeKey, clients);
 	}
 	
 	public void multiPut(List<String> keys, List<String> values) throws IllegalArgument{
-		//long start = System.nanoTime();
+		long start = System.nanoTime();
 		if(keys.size() != values.size()){
 			throw new IllegalArgument("size not equal!");
 		}
@@ -49,9 +54,9 @@ public class KeyValueHandler implements KeyValueService.Iface {
 			//posIdx[idx] = snNum;
 			idx++;
 		}
-		//long end = System.nanoTime() - start;
+		long end = System.nanoTime() - start;
 		//long end2;
-		for(int sn = 0; sn < serverNum; sn++){
+		for(Integer sn = 0; sn < serverNum; sn++){
 			
 			if(sn == myNum){//storageNode is current server
 				//System.out.println("Store in Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
@@ -62,28 +67,24 @@ public class KeyValueHandler implements KeyValueService.Iface {
 					storage.put(key, val);
 				}
 			}else{//storageNode is NOT current server
+				long openStart = System.nanoTime();
 				if(keyPar[sn].size() > 0){
-					//System.out.println("Store in Remote Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
-					//long openStart = System.currentTimeMillis();
 					try{
-					TSocket sock = new TSocket(hosts.get(sn), ports.get(sn));
-			  		TTransport transport = new TFramedTransport(sock);
-			  		TProtocol protocol = new TBinaryProtocol(transport);
-			  		KeyValueService.Client client = new KeyValueService.Client(protocol);
-			  		transport.open();
+					KeyValueService.Client client = FetchClient(sn);
 			  		client.multiPut(keyPar[sn], valPar[sn]);
-			  		transport.close();
-					}catch(TException x){
+			  		establishClient(sn,client);
+			  		//transport.close();
+					}catch(Exception x){
 						x.printStackTrace();
 					}
-					//long openEnd = System.currentTimeMillis() - openStart;
-					//System.out.println("open " + openEnd);
+					long openEnd = System.nanoTime() - openStart;
+					System.out.println("open " + openEnd);
 				}
 				
 			}
 		}
-		//long end3 = System.nanoTime() - start;
-		//System.out.println(end + " " + end3);
+		long end3 = System.nanoTime() - start;
+		System.out.println(end + " " + end3);
 		
 	}
 	
@@ -112,7 +113,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 			getVal.add(i, new ConcurrentLinkedQueue<>());;
 		}
 		
-		for(int sn = 0; sn < serverNum; sn++){
+		for(Integer sn = 0; sn < serverNum; sn++){
 			ConcurrentLinkedQueue<String> retVal = new ConcurrentLinkedQueue<>();
 			if(sn == myNum){
 				//System.out.println("Get from Server: " + hosts.get(sn) + " " + ports.get(sn) + ":");
@@ -129,7 +130,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 				getVal.add(sn, retVal);
 			}else{
 				if(keyPar.get(sn).size() > 0){
-					retVal = remoteGet(keyPar.get(sn), hosts.get(sn), ports.get(sn));
+					retVal = remoteGet(keyPar.get(sn), sn);
 					getVal.add(sn, retVal);
 				}
 			}
@@ -142,19 +143,16 @@ public class KeyValueHandler implements KeyValueService.Iface {
 		return ret;
 	}
 	
-	private ConcurrentLinkedQueue<String> remoteGet(List<String> keys, String remoteHost, int remotePort){
+	private ConcurrentLinkedQueue<String> remoteGet(List<String> keys, Integer sn){
 		
 		ConcurrentLinkedQueue<String> ret = new ConcurrentLinkedQueue<String>();
 		try{
-			//System.out.println("Get Value from Remote Server: " + remoteHost + " " + remotePort);
-			TSocket sock = new TSocket(remoteHost, remotePort);
-	  		TTransport transport = new TFramedTransport(sock);
-	  		TProtocol protocol = new TBinaryProtocol(transport);
-	  		KeyValueService.Client client = new KeyValueService.Client(protocol);
+
+			KeyValueService.Client client = FetchClient(sn);
 	  		List<String> getRemote = new LinkedList<String>();
-	  		transport.open();
 	  		getRemote = client.multiGet(keys);
-	  		transport.close();
+
+	  		establishClient(sn,client);
 	  		for(String s : getRemote){
 	  			ret.add(s);
 	  		}
@@ -164,6 +162,29 @@ public class KeyValueHandler implements KeyValueService.Iface {
 	    }
 		return ret;
 	}
+	
+	private void establishClient(Integer nodeKey, KeyValueService.Client client){
+
+   		synchronized(clientMap) {
+	    	LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
+	    	clients.add(client);
+	    	clientMap.put(nodeKey, clients);
+    	}
+    }
+
+    private KeyValueService.Client FetchClient(Integer nodeKey){
+    	if (nodeKey==myNum){
+    		return null;
+    	}
+
+    	synchronized(clientMap) {
+			LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
+			KeyValueService.Client client = clients.removeFirst();
+			clientMap.put(nodeKey, clients);
+			return client;
+		}
+    		
+  	}
 	
 }
 	
