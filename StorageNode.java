@@ -38,8 +38,8 @@ public class StorageNode {
       
       KeyValueHandler kvh = new KeyValueHandler(myNum, hosts, ports);
       createConnection connection = new createConnection(myNum, kvh, hosts, ports);
-      Thread t = new Thread(connection);
-      t.start();
+      Thread thread = new Thread(connection);
+      thread.start();
       
       KeyValueService.Processor<KeyValueService.Iface> processor =new KeyValueService.Processor<>(kvh);
       // Launch a Thrift server here
@@ -52,6 +52,7 @@ public class StorageNode {
 
       TServer server = new THsHaServer(sargs);
       server.serve();
+      thread.join();
       //throw new Error("This code needs more work!");
   }
   

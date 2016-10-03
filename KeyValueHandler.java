@@ -27,7 +27,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 	}
 	
 	public void multiPut(List<String> keys, List<String> values) throws IllegalArgument{
-		long start = System.nanoTime();
+		//long start = System.nanoTime();
 		if(keys.size() != values.size()){
 			throw new IllegalArgument("size not equal!");
 		}
@@ -54,7 +54,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 			//posIdx[idx] = snNum;
 			idx++;
 		}
-		long end = System.nanoTime() - start;
+		//long end = System.nanoTime() - start;
 		//long end2;
 		for(Integer sn = 0; sn < serverNum; sn++){
 			
@@ -67,7 +67,7 @@ public class KeyValueHandler implements KeyValueService.Iface {
 					storage.put(key, val);
 				}
 			}else{//storageNode is NOT current server
-				long openStart = System.nanoTime();
+				//long openStart = System.nanoTime();
 				if(keyPar[sn].size() > 0){
 					try{
 					KeyValueService.Client client = FetchClient(sn);
@@ -77,14 +77,14 @@ public class KeyValueHandler implements KeyValueService.Iface {
 					}catch(Exception x){
 						x.printStackTrace();
 					}
-					long openEnd = System.nanoTime() - openStart;
-					System.out.println("open " + openEnd);
+					//long openEnd = System.nanoTime() - openStart;
+					//System.out.println("open " + openEnd);
 				}
 				
 			}
 		}
-		long end3 = System.nanoTime() - start;
-		System.out.println(end + " " + end3);
+		//long end3 = System.nanoTime() - start;
+		//System.out.println(end + " " + end3);
 		
 	}
 	
@@ -164,11 +164,11 @@ public class KeyValueHandler implements KeyValueService.Iface {
 	}
 	
 	private void establishClient(Integer nodeKey, KeyValueService.Client client){
-
-   		synchronized(clientMap) {
-	    	LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
+		LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
+   		synchronized(clients) {
+	    	//LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
 	    	clients.add(client);
-	    	clientMap.put(nodeKey, clients);
+	    	//clientMap.put(nodeKey, clients);
     	}
     }
 
@@ -176,11 +176,11 @@ public class KeyValueHandler implements KeyValueService.Iface {
     	if (nodeKey==myNum){
     		return null;
     	}
-
-    	synchronized(clientMap) {
-			LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
+    	LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
+    	synchronized(clients) {
+			//LinkedList<KeyValueService.Client> clients = clientMap.get(nodeKey);
 			KeyValueService.Client client = clients.removeFirst();
-			clientMap.put(nodeKey, clients);
+			//clientMap.put(nodeKey, clients);
 			return client;
 		}
     		
